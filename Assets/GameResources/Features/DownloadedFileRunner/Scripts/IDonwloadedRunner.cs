@@ -5,7 +5,7 @@
     public interface IDonwloadedRunner
     {
         /// <summary>
-        /// Асинхронный запуск процесса (установки, распаковки и т.п.)
+        /// Asynchronous process launch (installation, unpacking, etc.)
         /// </summary>
         public Task<bool> RunAsync(string path);
     }

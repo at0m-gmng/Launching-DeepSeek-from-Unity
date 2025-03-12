@@ -15,7 +15,7 @@
         protected string[] requiredFiles;
 
         /// <summary>
-        /// Проверяет, существуют ли все файлы (с именами fileNames) в указанной папке.
+        /// Checks if all files (named fileNames) exist in the specified folder.
         /// </summary>
         public virtual bool IsContains()
         {
@@ -30,7 +30,7 @@
         }
         
         /// <summary>
-        /// Проверяет, существуют ли все файлы (с именами requiredFiles) в каталоге StreamingAssets.
+        /// Checks if all files (named requiredFiles) exist in the StreamingAssets directory.
         /// </summary>
         public virtual bool IsContainsInStreamingAssets()
         {
@@ -47,7 +47,7 @@
         }
         
         /// <summary>
-        /// Проверяет, существуют ли все файлы (с именами requiredFiles) в каталоге StreamingAssets.
+        /// Checks if all files (named requiredFiles) exist in the StreamingAssets directory.
         /// </summary>
         public virtual string GetContainsStreamingAssetsPath()
         {

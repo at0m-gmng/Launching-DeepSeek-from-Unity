@@ -14,7 +14,7 @@
 
     public class DeepSeekInstallRunner : BaseFileRunner, IProgressSystemNotification
     {
-        protected const string UNPUCKING_PROGRESS = "Распаковка: {0}";
+        protected const string UNPUCKING_PROGRESS = "Unpacking: {0}";
         
         [Inject]
         protected virtual void Construct(SystemMessageService _systemMessageService)
@@ -49,12 +49,12 @@
 
             if (string.IsNullOrEmpty(extractorPath))
             {
-                // Используем ZipArchive для пофайлового извлечения с прогрессом
+                // Use ZipArchive for file-by-file extraction with progress
                 await ExtractWithProgress(path);
             }
             else
             {
-                // Используем Process (например, 7z.exe) с мониторингом стандартного вывода
+                // Use a Process (e.g. 7z.exe) with standard output monitoring
                 await ExtractWithProcess();
             }
 
@@ -68,17 +68,10 @@
 
         protected virtual async Task ExtractWithProgress(string zipPath)
         {
-            onMessage("Запуск распаковки через ZipArchive...");
-            // Stopwatch stopwatch = Stopwatch.StartNew();
-            
-            // await UniTask.SwitchToMainThread();
-            //
+            onMessage("Starting unpacking via ZipArchive...");
+
             await Task.Run(async () =>
             {
-            
-                // Переключаемся в пул потоков для выполнения тяжелой работы
-                // await UniTask.SwitchToThreadPool();
-
                 using (ZipArchive archive = ZipFile.OpenRead(zipPath))
                 {
                     int totalFiles = archive.Entries.Count;
@@ -88,42 +81,30 @@
                     {
                         string destinationPath = Path.Combine(targetFolder, entry.FullName);
 
-                        // Если это папка — создаём её
                         if (string.IsNullOrEmpty(entry.Name))
                         {
                             Directory.CreateDirectory(destinationPath);
                             continue;
                         }
 
-                        // Извлекаем файл
                         entry.ExtractToFile(destinationPath, overwrite: true);
                         extractedFiles++;
 
-                        // Вычисляем прогресс
                         progress = (float)extractedFiles / totalFiles;
                         progressMax = progress * 100;
                         await UniTask.SwitchToMainThread();
                         onMessageProgress(string.Format(UNPUCKING_PROGRESS, progressMax), progressMax);
-                        Debug.LogError($"Распаковка: {(progress * 100).ToString("0.0")}");
+                        Debug.LogError($"Unboxing: {(progress * 100).ToString("0.0")}");
                         await UniTask.SwitchToThreadPool();
-                        
-                        // Немного уступаем главный поток, чтобы обновления UI могли обработаться
-                        // await UniTask.Yield();
-                        // Возвращаемся в пул потоков для продолжения работы
-                        // await UniTask.SwitchToThreadPool();
                     }
                 }
                 
-                // По завершении переключаемся на главный поток
-                // await UniTask.SwitchToMainThread();
             });
-            // stopwatch.Stop();
-            // await UniTask.SwitchToMainThread();
         }
 
         protected virtual async Task ExtractWithProcess()
         {
-            onMessage("Запуск распаковки через внешний инструмент...");
+            onMessage("Starting unpacking via external tool...");
 
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
@@ -145,11 +126,11 @@
 
                     if (process.ExitCode != 0)
                     {
-                        onMessage($"Ошибка распаковки: {errorMessage}");
+                        onMessage($"Unpacking error: {errorMessage}");
                     }
                 }
             });
-            onMessage("Распаковка завершена.");
+            onMessage("Unpacking complete.");
         }
     }
 }

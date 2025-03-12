@@ -10,7 +10,6 @@
     {
         public PythonChecker(string _targetFolder, string[] _requiredFiles) : base(_targetFolder, _requiredFiles)
         {
-            // requiredFiles = _requiredFiles;
             requiredFiles = _requiredFiles
             .Concat(new []
             {
@@ -22,7 +21,7 @@
             targetFolder = PlayerPrefs.GetString(pythonPathKey, string.Empty);
         }
 
-        protected readonly string pythonPathKey = "PythonPath"; // Ключ для хранения пути в PlayerPrefs
+        protected readonly string pythonPathKey = "PythonPath";
         protected string foundPath;
         
         public override bool IsContains() => !string.IsNullOrEmpty(TryGetPythonPath());
@@ -31,7 +30,6 @@
         {
             try
             {
-                // Запускаем команду "where python" для получения абсолютных путей
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
                     FileName = "where",
@@ -48,11 +46,10 @@
 
                     if (process.ExitCode == 0)
                     {
-                        // Выбираем первый найденный путь
                         string[] paths = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                         if (paths.Length > 0 && File.Exists(paths[0]))
                         {
-                            return paths[0]; // Возвращаем абсолютный путь к python.exe
+                            return paths[0];
                         }
                     }
                 }
@@ -64,13 +61,13 @@
         
         protected virtual string TryGetPythonPath()
         {
-            // 1. Проверяем кэшированный путь
+            // 1. Check the cached path
             if (!string.IsNullOrEmpty(targetFolder) && File.Exists(targetFolder))
             {
                 return targetFolder;
             }
 
-            // 2. Проверяем в системе
+            // 2. Check in the system
             foundPath = TryFindPython();
             if (!string.IsNullOrEmpty(foundPath))
             {

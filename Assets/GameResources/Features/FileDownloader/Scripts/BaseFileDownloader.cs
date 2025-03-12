@@ -25,8 +25,8 @@
         public event Action<string> onMessage = delegate {  };
         public event Action<string, float> onMessageProgress = delegate {  };
 
-        public virtual string DownloadedSuccess { get; protected set; } = "Скачивание завершено";
-        public virtual string DownloadedProgress { get; protected set; } = "Скачивание: {0}";
+        public virtual string DownloadedSuccess { get; protected set; } = "Download complete";
+        public virtual string DownloadedProgress { get; protected set; } = "Downloads: {0}";
 
         public virtual string InstalledPath { get; protected set; } = "NewFile_MascotProject";
 
@@ -54,14 +54,14 @@
                 if (File.Exists(destinationPath))
                 {
                     existingLength = new FileInfo(destinationPath).Length;
-                    UnityEngine.Debug.LogError($"Обнаружен существующий файл, размер = {existingLength} байт.");
+                    UnityEngine.Debug.LogError($"An existing file was found, size = {existingLength} bytes.");
 
                     InitNewHandler(true);
                     total = await GetExpectedFileSizeAsync(url, cancellationToken);
 
                     if (total != -1 && existingLength == total)
                     {
-                        UnityEngine.Debug.LogError("Файл уже скачан. Пропуск скачивания.");
+                        UnityEngine.Debug.LogError("File already downloaded. Skipping download.");
                         onMessageProgress(string.Empty, 1f);
                         return true;
                     }
@@ -78,7 +78,7 @@
                     if (existingLength > 0)
                     {
                         requestFileSize.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existingLength, null);
-                        onMessage($"Попытка продолжить загрузку с позиции {existingLength}.");
+                        onMessage($"Attempting to continue loading from position {existingLength}.");
                     }
 
                     using (response = await client.SendAsync(requestFileSize, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
@@ -88,19 +88,19 @@
                             if (response.Headers.Location != null)
                             {
                                 string newUrl = response.Headers.Location.ToString();
-                                Debug.LogError($"Редирект на {newUrl}");
+                                Debug.LogError($"Redirect to {newUrl}");
                                 return await DownloadFileAsync(newUrl, destinationPath, cancellationToken);
                             }
                             else
                             {
-                                Debug.LogError("Редирект без нового URL");
+                                Debug.LogError("Redirect without new URL");
                                 return false;
                             }
                         }
                 
                         if (response.StatusCode == System.Net.HttpStatusCode.OK && existingLength > 0)
                         {
-                            onMessage("Сервер не поддерживает возобновление. Начинаем загрузку заново.");
+                            onMessage("The server does not support resuming. Restarting the download.");
                             File.Delete(destinationPath);
                             existingLength = 0;
                         }
@@ -120,7 +120,7 @@
                             }
                         }
                         isRequiredReportProgress = total != -1;
-                        onMessage($"Общий размер файла: {total} байт.");
+                        onMessage($"Total file size: {total} bytes.");
 
                         using (fileStream = new FileStream(destinationPath, existingLength > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                         {
@@ -155,7 +155,7 @@
             }
             catch (TaskCanceledException)
             {
-                onMessage("Скачивание отменено пользователем");
+                onMessage("Download cancelled by user");
                 return false;
             }
             catch (Exception ex)
@@ -167,7 +167,7 @@
         }
 
         /// <summary>
-        /// Загрузка установщика с повторными попытками, если файл повреждён.
+        /// Downloading the installer with repeated attempts if the file is damaged.
         /// </summary>
         public virtual async Task<string> DownloadInstallerAsync(string downloadUrl, CancellationToken cancellationToken = default)
         {
@@ -183,8 +183,8 @@
                     tempFilePath = Path.Combine(Application.streamingAssetsPath, InstalledPath);
                     tempFilePath = tempFilePath.Replace('/', Path.DirectorySeparatorChar);
 
-                    Debug.LogError($"Попытка загрузки установщика: {attempts} из {maxAttempts}");
-                    onMessage($"Попытка загрузки установщика: {attempts} из {maxAttempts}");
+                    Debug.LogError($"Attempting to download installer: {attempts} of {maxAttempts}");
+                    onMessage($"Attempting to download installer: {attempts} of {maxAttempts}");
                     if (!await DownloadFileAsync(downloadUrl, tempFilePath, cancellationToken))
                     {
                         tempFilePath = string.Empty;
@@ -197,7 +197,7 @@
                 if (!valid)
                 {
                     tempFilePath = string.Empty;
-                    Debug.LogError("Не удалось скачать корректный установщик после " + maxAttempts + " попыток.");
+                    Debug.LogError("Failed to download valid installer after " + maxAttempts + " attempts.");
                 }
                 return tempFilePath;
             }
@@ -208,12 +208,12 @@
         }
         
         /// <summary>
-        /// Проверка целостности ZIP-файла.
-        /// Если архив повреждён (например, не найден End of Central Directory), будет выброшено исключение.
+        /// Check the integrity of the ZIP file.
+        /// If the archive is corrupted (e.g. End of Central Directory not found), an exception will be thrown.
         /// </summary>
         protected virtual bool IsZipFileValid(string filePath)
         {
-            // Если файл не имеет расширения .zip, пропускаем проверку целостности
+            // If the file does not have a .zip extension, skip the integrity check
             if (Path.GetExtension(filePath).ToLower() != ".zip")
             {
                 return true;
@@ -221,10 +221,9 @@
 
             try
             {
-                // Пытаемся открыть файл как ZIP-архив
                 using (var archive = ZipFile.OpenRead(filePath))
                 {
-                    // Если архив открылся без ошибок, считаем его валидным
+                    // If the archive opened without errors, we consider it valid
                 }
                 return true;
             }
@@ -244,40 +243,37 @@
             {
                 try
                 {
-                    // Создаем HttpClient с тем же обработчиком (handler)
                     using (var headClient = new HttpClient(handler))
                     {
                         var headRequest = new HttpRequestMessage(HttpMethod.Head, url);
                         var headResponse = await headClient.SendAsync(headRequest, cancellationToken);
             
-                        // Проверяем статус ответа
                         if (headResponse.StatusCode == System.Net.HttpStatusCode.OK)
                         {
-                            // Если HEAD-запрос возвращает 200 OK, пытаемся получить Content-Length
                             if (headResponse.Content.Headers.ContentLength.HasValue)
                             {
                                 long contentLength = headResponse.Content.Headers.ContentLength.Value;
                     
-                                // Дополнительная проверка: если размер меньше минимально допустимого (например, 100 байт), считаем его некорректным
+                                // Additional check: if the size is less than the minimum allowed (for example, 100 bytes), we consider it invalid
                                 if (contentLength > 100)
                                 {
                                     return contentLength;
                                 }
                                 else
                                 {
-                                    // Если размер слишком мал, возможно, сервер вернул HTML-страницу или ошибку
+                                    // If the size is too small, the server may have returned an HTML page or an error
                                     return -1L;
                                 }
                             }
                             else
                             {
-                                // Если заголовок Content-Length отсутствует, возвращаем -1
+                                // If the Content-Length header is missing, return -1
                                 return -1L;
                             }
                         }
                         else
                         {
-                            // Для других успешных кодов (например, 206 Partial Content)
+                            // For other success codes (eg 206 Partial Content)
                             headResponse.EnsureSuccessStatusCode();
                             return headResponse.Content.Headers.ContentLength ?? -1L;
                         }
@@ -285,7 +281,7 @@
                 }
                 catch (Exception e)
                 {
-                    // В случае любой ошибки возвращаем -1, сигнализируя, что ожидаемый размер не определен
+                    // In case of any error, return -1, signaling that the expected size is not defined
                     return -1L;
                 }
             }, cancellationToken).ConfigureAwait(false);
@@ -295,7 +291,6 @@
         {
             handler = new HttpClientHandler();
             handler.AllowAutoRedirect = autoRedirect;
-            // handler.MaxRequestContentBufferSize = long.MaxValue;
         }
 
         protected virtual void OnMessage(string message) => onMessage(message);

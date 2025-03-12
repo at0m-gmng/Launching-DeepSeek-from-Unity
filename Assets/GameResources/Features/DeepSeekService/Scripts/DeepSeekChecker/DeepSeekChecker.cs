@@ -9,7 +9,7 @@
         public override bool IsContains() => IsContainsInStreamingAssets() | base.IsContains();
 
         /// <summary>
-        /// Проверяет, существуют ли все файлы (с именами requiredFiles) в каталоге StreamingAssets.
+        /// Checks if all files (named requiredFiles) exist in the StreamingAssets directory.
         /// </summary>
         public override bool IsContainsInStreamingAssets()
         {

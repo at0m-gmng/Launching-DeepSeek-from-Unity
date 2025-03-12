@@ -29,9 +29,9 @@
             maxAttempts = _maxAttempts;
         }
         
-        protected const string SERVER_RUNNING_SUCCESS = "Сервер DeepSeek запущен!";
-        protected const string SERVER_RUNNING_FAILED = "Сервер DeepSeek не запустился или истекло время!";
-        protected const string ERROR = "Ошибка: {0}";
+        protected const string SERVER_RUNNING_SUCCESS = "DeepSeek server is running!";
+        protected const string SERVER_RUNNING_FAILED = "DeepSeek server failed to start or timed out!";
+        protected const string ERROR = "Error: {0}";
         protected const string SHUTDOWN_URL = "http://127.0.0.1:5000/shutdown";
         
         public event Action<string> onMessage = delegate { };
@@ -64,7 +64,7 @@
 
             if (!File.Exists(scriptPath))
             {
-                Debug.LogError("Файл для запуска сервера не найден.");
+                Debug.LogError("The file to start the server was not found.");
                 return false;
             }
             
@@ -73,7 +73,7 @@
 
             if (string.IsNullOrEmpty(pythonPath))
             {
-                Debug.LogError("Python не найден в системе.");
+                Debug.LogError("Python not found on the system.");
                 return false;
             }
 
@@ -110,7 +110,7 @@
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Ошибка при запуске Python процесса: {ex.Message}");
+                Debug.LogError($"Error starting Python process: {ex.Message}");
             }
         }
 
@@ -233,7 +233,6 @@
             request = UnityWebRequest.PostWwwForm(SHUTDOWN_URL, "");
             using (request)
             {
-                // Отправляем запрос и ждём завершения
                 await request.SendWebRequest();
             
 #if UNITY_2020_1_OR_NEWER
@@ -242,11 +241,11 @@
             if (request.isNetworkError || request.isHttpError)
 #endif
                 {
-                    Debug.LogError("Ошибка при попытке завершить Python сервер: " + request.error);
+                    Debug.LogError("Error trying to terminate Python server:" + request.error);
                 }
                 else
                 {
-                    Debug.Log("Запрос на завершение Python сервера успешно отправлен.");
+                    Debug.Log("The request to terminate the Python server was sent successfully.");
                 }
             }
         }

@@ -27,9 +27,9 @@
             dependenciesPath = _dependenciesPath;
         }
      
-        protected const string INSTALL_DEPENDENCIES = "Установка зависимостей...";
-        protected const string INSTALL_DEPENDENCIES_ENDED = "Установка зависимостей завершена";
-        protected const string ERROR = "Ошибка: {0}";
+        protected const string INSTALL_DEPENDENCIES = "Installing dependencies...";
+        protected const string INSTALL_DEPENDENCIES_ENDED = "Installation of dependencies is complete";
+        protected const string ERROR = "Error: {0}";
         
         public event Action<string> onMessage = delegate { };
 
@@ -50,7 +50,7 @@
 
             if (!File.Exists(requirementsPath))
             {
-                Debug.LogError("Не найден файл requirements.txt по пути: " + requirementsPath);
+                Debug.LogError("Requirements.txt file not found at path:" + requirementsPath);
                 return false;
             }
             
@@ -58,7 +58,7 @@
 
             if (string.IsNullOrEmpty(pythonPath))
             {
-                Debug.LogError("Python не найден в системе.");
+                Debug.LogError("Python not found on the system.");
                 return false;
             }
 
@@ -165,7 +165,7 @@
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"Ошибка при завершении процесса: {ex.Message}");
+                    Debug.LogError($"Error terminating process: {ex.Message}");
                 }
             }
             else

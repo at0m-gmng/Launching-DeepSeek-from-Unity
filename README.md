@@ -5,7 +5,7 @@
 1) Download the AI model DeepSeek from the link:
    https://huggingface.co/unsloth/DeepSeek-R1-Distill-Llama-8B/tree/main
 2) Place the downloaded files in StreammingAsssets/DeepSeek
-3) Launch the application
+3) Launch the Editor Application (at the moment the build is not supported)
 
 ## How does this work?
 

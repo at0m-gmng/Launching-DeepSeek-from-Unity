@@ -15,9 +15,9 @@
             string installerUrl = ""
         ) : base(faleChecker, fileDownloader, fileRunner, installerUrl) { }
         
-        protected override string FileNotFind { get; set; } = "Модель DeepSeek не найдена. Начинается загрузка установщика...";
-        protected override string InstallerDownloaded { get; set; } = "Модель скачана. Запуск распаковки...";
-        protected override string InstallerEnded { get; set; } = "Распаковка DeepSeek завершена.";
-        protected override string ProgrammInstalled { get; set; } = "DeepSeek найден.";
+        protected override string FileNotFind { get; set; } = "DeepSeek model not found. Starting to download installer...";
+        protected override string InstallerDownloaded { get; set; } = "Model downloaded. Starting unpacking...";
+        protected override string InstallerEnded { get; set; } = "DeepSeek unboxing complete.";
+        protected override string ProgrammInstalled { get; set; } = "DeepSeek found.";
     }
 }

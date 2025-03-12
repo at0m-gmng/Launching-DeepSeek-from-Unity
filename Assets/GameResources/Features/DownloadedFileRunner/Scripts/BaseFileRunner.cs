@@ -5,7 +5,7 @@
     public class BaseFileRunner : IDonwloadedRunner
     {
         /// <summary>
-        /// Асинхронный запуск процесса (установки, распаковки и т.п.)
+        /// Asynchronous process launch (installation, unpacking, etc.)
         /// </summary>
         public virtual Task<bool> RunAsync(string path) => default;
     }

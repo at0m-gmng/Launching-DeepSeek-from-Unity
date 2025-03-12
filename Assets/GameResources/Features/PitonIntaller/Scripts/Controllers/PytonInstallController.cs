@@ -24,10 +24,10 @@
             pythonVersion = _pythonVersion;
         }
         
-        protected override string FileNotFind { get; set; } = "Python не найден. Начинается загрузка установщика...";
-        protected override string InstallerDownloaded { get; set; } = "Установщик скачан. Запуск установки...";
-        protected override string InstallerEnded { get; set; } = "Установка Python завершена.";
-        protected override string ProgrammInstalled { get; set; } = "Python уже установлен.";
+        protected override string FileNotFind { get; set; } = "Python not found. Starting to download installer...";
+        protected override string InstallerDownloaded { get; set; } = "Installer downloaded. Starting installation...";
+        protected override string InstallerEnded { get; set; } = "Python installation is complete.";
+        protected override string ProgrammInstalled { get; set; } = "Python is already installed.";
         
         protected readonly string pythonVersion = default;
         

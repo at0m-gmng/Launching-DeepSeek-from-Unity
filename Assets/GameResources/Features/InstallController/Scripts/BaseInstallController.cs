@@ -34,14 +34,14 @@
         }
         
         
-        protected const string INSTALL_FAILED = "Установка не завершена";
+        protected const string INSTALL_FAILED = "Installation not completed";
 
         public event Action<string> onMessage = delegate {};
 
-        protected virtual string FileNotFind { get; set; } = "Файл не найден. Начинается загрузка установщика...";
-        protected virtual string InstallerDownloaded { get; set; } = "Установщик скачан. Запуск установки...";
-        protected virtual string InstallerEnded { get; set; } = "Установка файла завершена.";
-        protected virtual string ProgrammInstalled { get; set; } = "Файл уже установлен.";
+        protected virtual string FileNotFind { get; set; } = "File not found. Starting installer download...";
+        protected virtual string InstallerDownloaded { get; set; } = "Installer downloaded. Starting installation...";
+        protected virtual string InstallerEnded { get; set; } = "The file installation is complete.";
+        protected virtual string ProgrammInstalled { get; set; } = "The file is already installed.";
 
         
         protected SystemMessageService systemMessageService;

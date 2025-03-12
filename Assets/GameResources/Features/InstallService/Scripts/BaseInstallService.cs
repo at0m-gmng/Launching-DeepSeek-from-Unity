@@ -12,7 +12,7 @@
 
     public class BaseInstallService: MonoInstaller
     {
-        [Header("Необязательно: укажите URL установщика, если хотите использовать другой источник")]
+        [Header("Optional: Specify the installer URL if you want to use a different source")]
         [SerializeField] 
         protected string installerUrl = "";
 
@@ -29,7 +29,7 @@
             "/usr/local/bin/python3"
         };
         
-        [Header("Задержка в милисекундах")]
+        [Header("Delay in milliseconds")]
         [Min(0)]
         [SerializeField]
         protected int delayTicks = 1500;

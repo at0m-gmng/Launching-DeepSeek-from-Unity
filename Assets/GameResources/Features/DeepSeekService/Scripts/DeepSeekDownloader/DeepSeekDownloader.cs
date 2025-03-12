@@ -10,8 +10,8 @@
     public class DeepSeekDownloader : BaseFileDownloader
     {
         protected const string DEEPSEEK_PATH_FOLDER = "DeepSeek";
-        public override string DownloadedSuccess { get; protected set; } = "Загрузка DeepSeek завершена. Распаковка архива...";
-        public override string DownloadedProgress { get; protected set; } = "Скачивание DeepSeek: {0}";
+        public override string DownloadedSuccess { get; protected set; } = "DeepSeek download complete. Unpacking archive...";
+        public override string DownloadedProgress { get; protected set; } = "DeepSeek download: {0}";
         public override string InstalledPath { get; protected set; } = "DeepSeek.zip";
         
         protected string extractDirectory = default;

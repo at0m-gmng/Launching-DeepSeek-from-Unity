@@ -83,11 +83,11 @@
                 if (request.isNetworkError || request.isHttpError)
 #endif
                 {
-                    Debug.LogError("Ошибка запроса: " + request.error);
+                    Debug.LogError("Request error:" + request.error);
                 }
                 else
                 {
-                    Debug.Log("Ответ модели: " + request.downloadHandler.text);
+                    Debug.Log("Model response:" + request.downloadHandler.text);
                     onAnswerReceived(request.downloadHandler.text);
                 }
             }

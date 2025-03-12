@@ -10,7 +10,7 @@
 
     public class PythonInstallService : BaseInstallService, IService
     {
-        [Header("Укажите версию Python для установки (например, 3.9.7)")]
+        [Header("Specify the Python version to install (e.g. 3.9.7)")]
         [SerializeField] private string pythonVersion = "3.9.7";
 
         public override void InstallBindings() 
