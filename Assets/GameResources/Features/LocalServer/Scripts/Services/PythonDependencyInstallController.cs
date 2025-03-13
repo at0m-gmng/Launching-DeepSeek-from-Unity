@@ -3,6 +3,8 @@
     using System;
     using System.Diagnostics;
     using System.IO;
+    using System.Linq;
+    using System.Runtime.InteropServices;
     using System.Threading.Tasks;
     using GameResources.Features.SystemNotification.Scripts;
     using GameResources.Features.SystemNotification.Scripts.Interfaces;
@@ -11,6 +13,7 @@
     using UnityEngine;
     using Zenject;
     using Debug = UnityEngine.Debug;
+    using Microsoft.Win32;
 
     public class PythonDependencyInstallController: ISystemNotification, IService
     {
@@ -58,8 +61,10 @@
                 Debug.LogError("Requirements.txt file not found at path:" + requirementsPath);
                 return false;
             }
-            
-            pythonPath = await FindPythonPath();
+
+            pythonPath = await GetPythonPathFromRegistry();
+            Debug.LogError($"pythonPath {pythonPath}");
+            Debug.LogError($"requirementsPath {requirementsPath}");
 
             if (string.IsNullOrEmpty(pythonPath))
             {
@@ -69,121 +74,74 @@
 
             return await InstallDependencies();
         }
-
-        protected async Task<string> FindPythonPath()
+        
+        protected async Task<string> GetPythonPathFromRegistry()
         {
             return await Task.Run(() =>
             {
-                data = new ProcessStartInfo
+                try
                 {
-                    FileName = "where",
-                    Arguments = "python",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                process = new Process { StartInfo = data };
-                
-                using (process)
-                {
-                    process.Start();
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode == 0)
+                    using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Python\PythonCore"))
                     {
-                        return output.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries)[0];
-                    }
-                    else
-                    {
-                        Debug.LogError(string.Format(ERROR, error));
-                        return null;
+                        var versions = key?.GetSubKeyNames();
+                        var latestVersion = versions?.OrderByDescending(v => v).FirstOrDefault();
+                        if (latestVersion != null)
+                        {
+                            using (var installKey = key.OpenSubKey($@"{latestVersion}\InstallPath"))
+                            {
+                                return installKey?.GetValue("ExecutablePath")?.ToString();
+                            }
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Ошибка чтения реестра: {ex.Message}");
+                }
+
+                return null;
             });
         }
 
         protected virtual async Task<bool> InstallDependencies()
         {
-            await Task.Run(() =>
+            return await Task<bool>.Run(() =>
             {
-                data = new ProcessStartInfo
+                string workingDir = @$"{Path.GetDirectoryName(requirementsPath)}";
+                string commandLine = $"\"{pythonPath}\" -m pip install -r \"{requirementsPath}\"";
+                
+                var startupInfo = new  WindowsJobObjectApi.STARTUPINFO();
+                startupInfo.cb = Marshal.SizeOf(startupInfo);
+                var processInfo = new WindowsJobObjectApi.PROCESS_INFORMATION();
+                
+                bool success = WindowsJobObjectApi.CreateProcess(
+                    null,               // Путь к исполняемому файлу (null, так как указан в commandLine)
+                    commandLine,        // Командная строка с аргументами
+                    IntPtr.Zero,        // Атрибуты процесса (по умолчанию)
+                    IntPtr.Zero,        // Атрибуты потока (по умолчанию)
+                    false,              // Не наследовать дескрипторы
+                    0,                  // Флаги создания (по умолчанию)
+                    IntPtr.Zero,        // Среда окружения (по умолчанию)
+                    workingDir,         // Рабочий каталог
+                    ref startupInfo,    // Параметры запуска
+                    out processInfo     // Информация о запущенном процессе
+                );
+                
+                if (success)
                 {
-                    FileName = pythonPath,
-                    Arguments = $"-m pip install -r \"{requirementsPath}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                process = new Process { StartInfo = data };
-
-                using (process)
-                {
-                    process.Start();
-                    onMessage(INSTALL_DEPENDENCIES);
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (!string.IsNullOrEmpty(error) && !IsContainsString(error))
-                    {
-                        Debug.LogError(string.Format(ERROR, error));
-                        return false;
-                    }
-                    else
-                    {
-                        onMessage(INSTALL_DEPENDENCIES_ENDED);
-                        Debug.LogError(INSTALL_DEPENDENCIES_ENDED);
-                        return true;
-                    }
-                }
-            });
-
-            return true;
-        }
-
-        protected virtual bool IsContainsString(string error)
-        {
-            for (int i = 0; i < ignoreErrorFields.Length; i++)
-            {
-                if (error.Contains(ignoreErrorFields[i]))
-                {
+                    Debug.Log("Процесс Python успешно запущен.");
+                    // Закрываем дескрипторы, чтобы избежать утечек ресурсов
+                    WindowsJobObjectApi.CloseHandle(processInfo.hProcess);
+                    WindowsJobObjectApi.CloseHandle(processInfo.hThread);
                     return true;
                 }
-            }
-
-            return false;
-        }
-        
-        public virtual void OnApplicationQuit()
-        {
-            if (process != null && !process.HasExited)
-            {
-                try
+                else
                 {
-                    process.Kill();
+                    int error = Marshal.GetLastWin32Error();
+                    Debug.LogError($"Не удалось запустить процесс. Код ошибки: {error}");
+                    return false;
                 }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"Error terminating process: {ex.Message}");
-                }
-            }
-            else
-            {
-                if (process == null)
-                {
-                    Debug.LogError($"Process null");
-                }
-                if(process != null && process.HasExited)
-                {
-                    Debug.LogError($"Process not exist");
-                }
-            }
+            });
         }
     }
 }
