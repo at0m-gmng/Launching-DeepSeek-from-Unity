@@ -3,11 +3,11 @@
     using System;
     using System.Diagnostics;
     using System.IO;
-    using System.Linq;
     using System.Threading.Tasks;
     using GameResources.Features.SystemNotification.Scripts;
     using GameResources.Features.SystemNotification.Scripts.Interfaces;
     using GameResources.Services.Scripts;
+    using ProcessController;
     using UnityEngine;
     using Zenject;
     using Debug = UnityEngine.Debug;
@@ -15,10 +15,12 @@
     public class PythonDependencyInstallController: ISystemNotification, IService
     {
         [Inject]
-        protected virtual void Construct(SystemMessageService _systemMessageService)
+        protected virtual void Construct(SystemMessageService _systemMessageService, ProcessService _processService)
         {
             systemMessageService = _systemMessageService;
+            processService = _processService;
             systemMessageService.RegisterMessage(this);
+            processService.RegisterProcess(process);
         }
 
         [Inject]
@@ -33,12 +35,15 @@
         
         public event Action<string> onMessage = delegate { };
 
-        protected readonly string dependenciesPath;
-        protected string pythonPath;
-        protected string requirementsPath;
+        protected SystemMessageService systemMessageService = default;
+        protected ProcessService processService = default;
         protected Process process;
         protected ProcessStartInfo data = default;
-        protected SystemMessageService systemMessageService = default;
+        
+        protected readonly string dependenciesPath;
+        
+        protected string pythonPath;
+        protected string requirementsPath;
         protected string[] ignoreErrorFields = new string[]
         {
             "WARNING"

@@ -7,6 +7,7 @@
     using System.Threading.Tasks;
     using Cysharp.Threading.Tasks;
     using DownloadedFileRunner.Scripts;
+    using ProcessController;
     using SystemNotification.Scripts;
     using SystemNotification.Scripts.Interfaces;
     using Zenject;
@@ -17,10 +18,12 @@
         protected const string UNPUCKING_PROGRESS = "Unpacking: {0}";
         
         [Inject]
-        protected virtual void Construct(SystemMessageService _systemMessageService)
+        protected virtual void Construct(SystemMessageService _systemMessageService, ProcessService _processService)
         {
             systemMessageService = _systemMessageService;
+            processService = _processService;
             systemMessageService.RegisterMessage(this);
+            processService.RegisterProcess(process);
         }
         
         public DeepSeekInstallRunner(string _targetFolder, string _extractorPath)
@@ -33,6 +36,7 @@
         public event Action<string, float> onMessageProgress = delegate { };
 
         protected SystemMessageService systemMessageService = default;
+        protected ProcessService processService = default;
         protected readonly string targetFolder = default;
         protected readonly string extractorPath = default;
         protected string errorMessage = default;

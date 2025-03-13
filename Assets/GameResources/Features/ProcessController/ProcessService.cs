@@ -10,8 +10,11 @@
     {
         protected IntPtr jobHandle;
         
-        public override void InstallBindings() 
-            => Container.Bind<IService>().To<ProcessService>().FromComponentOn(gameObject).AsTransient();
+        public override void InstallBindings()
+        {
+            Container.Bind<IService>().To<ProcessService>().FromComponentOn(gameObject).AsTransient();
+            Container.Bind<ProcessService>().FromInstance(this);
+        }
 
         public async Task<bool> TryRegister()
         {
@@ -28,14 +31,10 @@
             return false;
         }
 
-        public bool AddProcess(Process process)
-        {
-            if (Environment.OSVersion.Platform != PlatformID.Win32NT || process == null || process.HasExited)
-                return false;
+        public bool RegisterProcess(Process process) 
+            => Environment.OSVersion.Platform == PlatformID.Win32NT && process != null &&
+               !process.HasExited && WindowsJobObjectApi.AssignProcessToJob(jobHandle, process);
 
-            return WindowsJobObjectApi.AssignProcessToJob(jobHandle, process);
-        }
-        
         protected virtual void Dispose()
         {
             if (jobHandle != IntPtr.Zero)

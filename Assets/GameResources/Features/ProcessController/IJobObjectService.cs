@@ -4,6 +4,6 @@
 
     public interface IJobObjectService
     {
-        bool AddProcess(Process process);
+        public bool RegisterProcess(Process process);
     }
 }
