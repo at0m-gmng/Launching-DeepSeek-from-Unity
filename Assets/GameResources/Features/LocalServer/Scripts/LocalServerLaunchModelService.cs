@@ -1,6 +1,5 @@
 ﻿namespace GameResources.Features.LocalServer.Scripts
 {
-    using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
     using GameResources.Services.Scripts;
@@ -36,10 +35,18 @@
 
         public virtual async Task<bool> TryRegister()
         {
-            pythonDependencyInstallController = new PythonDependencyInstallController(dependenciesPath);
+            pythonDependencyInstallController = Container.Instantiate<PythonDependencyInstallController>(new object[]
+            {
+                dependenciesPath
+            });
             initializeServices.Add(pythonDependencyInstallController);
             
-            localServerLaunchControllerModel = new LocalServerLaunchControllerModel(serverFileName, serverURL, maxInitWaitTime);
+            localServerLaunchControllerModel = Container.Instantiate<LocalServerLaunchControllerModel>(new object[]
+            {
+                serverFileName,
+                serverURL,
+                maxInitWaitTime
+            });
             initializeServices.Add(localServerLaunchControllerModel);
 
             for (int i = 0; i < initializeServices.Count; i++)

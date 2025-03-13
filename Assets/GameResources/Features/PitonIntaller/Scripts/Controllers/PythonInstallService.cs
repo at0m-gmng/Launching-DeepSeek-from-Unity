@@ -18,9 +18,14 @@
 
         public virtual async Task<bool> TryRegister()
         {
-            fileChecker = new PythonChecker("", RequiredFiles);
+            fileChecker = Container.Instantiate<PythonChecker>(new object[]
+            {
+                string.Empty, 
+                RequiredFiles
+            });
+            
             fileDownloader = Container.Instantiate<PythonDownloader>();
-            installRunner = new PythonInstallRunner();
+            installRunner = Container.Instantiate<PythonInstallRunner>();
 
             installController = Container.Instantiate<PytonInstallController>(new object[]
             {

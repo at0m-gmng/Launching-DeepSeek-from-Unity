@@ -4,10 +4,19 @@
     using System.Diagnostics;
     using System.IO;
     using System.Linq;
+    using ProcessController;
     using UnityEngine;
+    using Zenject;
 
     public class PythonChecker : GameResources.Features.FileChecker.Scripts.BaseFileCheker
     {
+        [Inject]
+        protected virtual void Construct(ProcessService _processService)
+        {
+            processService = _processService;
+            processService.RegisterProcess(process);
+        }
+        
         public PythonChecker(string _targetFolder, string[] _requiredFiles) : base(_targetFolder, _requiredFiles)
         {
             requiredFiles = _requiredFiles
@@ -20,9 +29,14 @@
             
             targetFolder = PlayerPrefs.GetString(pythonPathKey, string.Empty);
         }
-
+        
+        protected ProcessService processService = default;
+        protected Process process = default;
+        
         protected readonly string pythonPathKey = "PythonPath";
+        
         protected string foundPath;
+        protected string output;
         
         public override bool IsContains() => !string.IsNullOrEmpty(TryGetPythonPath());
 
@@ -39,9 +53,9 @@
                     CreateNoWindow = true
                 };
 
-                using (Process process = Process.Start(startInfo))
+                using (process = Process.Start(startInfo))
                 {
-                    string output = process.StandardOutput.ReadToEnd();
+                    output = process.StandardOutput.ReadToEnd();
                     process.WaitForExit();
 
                     if (process.ExitCode == 0)

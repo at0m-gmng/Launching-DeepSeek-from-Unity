@@ -8,6 +8,7 @@
     using GameResources.Features.SystemNotification.Scripts;
     using GameResources.Features.SystemNotification.Scripts.Interfaces;
     using GameResources.Services.Scripts;
+    using ProcessController;
     using UnityEngine;
     using UnityEngine.Networking;
     using Zenject;
@@ -16,10 +17,12 @@
     public class LocalServerLaunchControllerModel: ISystemNotification, IService
     {
         [Inject]
-        protected virtual void Construct(SystemMessageService _systemMessageService)
+        protected virtual void Construct(SystemMessageService _systemMessageService, ProcessService _processService)
         {
             systemMessageService = _systemMessageService;
+            processService = _processService;
             systemMessageService.RegisterMessage(this);
+            processService.RegisterProcess(process);
         }
 
         public LocalServerLaunchControllerModel(string _serverFileName, string _serverURL, int _maxAttempts)
@@ -37,6 +40,7 @@
         public event Action<string> onMessage = delegate { };
 
         protected SystemMessageService systemMessageService = default;
+        protected ProcessService processService = default;
         protected readonly MonoBehaviour monoBehaviour = default;
         protected readonly string serverFileName = default;
         protected readonly string serverURL = default;

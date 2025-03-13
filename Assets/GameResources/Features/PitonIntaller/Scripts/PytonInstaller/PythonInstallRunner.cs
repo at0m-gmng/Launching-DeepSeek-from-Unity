@@ -1,12 +1,23 @@
 ﻿namespace GameResources.Features.PitonIntaller.Scripts.PytonInstaller
 {
     using System.Diagnostics;
-    using System.IO;
     using System.Threading.Tasks;
     using DownloadedFileRunner.Scripts;
+    using ProcessController;
+    using Zenject;
 
     public class PythonInstallRunner : BaseFileRunner
     {
+        [Inject]
+        protected virtual void Construct(ProcessService _processService)
+        {
+            processService = _processService;
+            processService.RegisterProcess(process);
+        }
+        
+        protected ProcessService processService = default;
+        protected Process process = default;
+        
         public override async Task<bool> RunAsync(string path)
         {
             ProcessStartInfo startInfo = new ProcessStartInfo
@@ -19,7 +30,7 @@
                 CreateNoWindow = true
             };
 
-            Process process = Process.Start(startInfo);
+            process = Process.Start(startInfo);
             
             using (process)
             {
