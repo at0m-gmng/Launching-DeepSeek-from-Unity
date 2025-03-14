@@ -47,7 +47,7 @@
                 bool result = SetInformationJobObject(jobHandle, JobObjectInfoType.ExtendedLimitInformation, extendedInfoPtr, (uint)length);
                 if (!result)
                 {
-                    Debug.LogError("Не удалось установить информацию для JobObject.");
+                    Debug.LogError("Failed to set information for JobObject.");
                 }
                 return result;
             }
@@ -57,19 +57,16 @@
             }
         }
 
-        /// <summary>
-        /// Регистрирует процесс в JobObject.
-        /// </summary>
         public static bool AssignProcessToJob(IntPtr jobHandle, Process process)
         {
             if (process == null || process.HasExited)
                 return false;
             return AssignProcessToJobObject(jobHandle, process.Handle);
         }
+        
+        public static bool AssignProcessToJob(IntPtr jobHandle, IntPtr processHandle) 
+            => AssignProcessToJobObject(jobHandle, processHandle);
 
-        /// <summary>
-        /// Закрывает дескриптор JobObject.
-        /// </summary>
         public static void CloseJob(IntPtr jobHandle)
         {
             if (jobHandle != IntPtr.Zero)
@@ -152,6 +149,8 @@
             public int dwProcessId;
             public int dwThreadId;
         }
+        
+        public const uint CREATE_NO_WINDOW = 0x08000000;
         
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);

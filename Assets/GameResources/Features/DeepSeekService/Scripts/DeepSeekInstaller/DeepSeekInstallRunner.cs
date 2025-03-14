@@ -23,7 +23,6 @@
             systemMessageService = _systemMessageService;
             processService = _processService;
             systemMessageService.RegisterMessage(this);
-            processService.RegisterProcess(process);
         }
         
         public DeepSeekInstallRunner(string _targetFolder, string _extractorPath)
@@ -108,23 +107,23 @@
 
         protected virtual async Task ExtractWithProcess()
         {
-            onMessage("Starting unpacking via external tool...");
-
-            ProcessStartInfo startInfo = new ProcessStartInfo
-            {
-                FileName = targetFolder,
-                Arguments = $"x \"{extractorPath}\" -o\"{targetFolder}\" -y",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
             await Task.Run(() =>
             {
-                process = Process.Start(startInfo);
-                using (process)
+                onMessage("Starting unpacking via external tool...");
+
+                ProcessStartInfo startInfo = new ProcessStartInfo
                 {
+                    FileName = targetFolder,
+                    Arguments = $"x \"{extractorPath}\" -o\"{targetFolder}\" -y",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                
+                using (process = Process.Start(startInfo))
+                {
+                    processService.RegisterProcess(process);
                     process.WaitForExit();
                     errorMessage = process.StandardError.ReadToEnd();
 

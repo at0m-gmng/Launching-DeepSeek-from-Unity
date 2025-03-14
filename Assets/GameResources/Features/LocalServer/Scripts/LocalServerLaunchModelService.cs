@@ -61,11 +61,5 @@
             
             return isComplete;
         }
-
-        protected void OnApplicationQuit()
-        {
-            Debug.LogError("OnApplicationQuit", gameObject);
-            localServerLaunchControllerModel.OnApplicationQuit();
-        }
     }
 }

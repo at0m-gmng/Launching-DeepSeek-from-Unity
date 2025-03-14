@@ -1,7 +1,6 @@
 ﻿namespace GameResources.Features.LocalServer.Scripts.Services
 {
     using System;
-    using System.Diagnostics;
     using System.IO;
     using System.Linq;
     using System.Runtime.InteropServices;
@@ -23,7 +22,6 @@
             systemMessageService = _systemMessageService;
             processService = _processService;
             systemMessageService.RegisterMessage(this);
-            processService.RegisterProcess(process);
         }
 
         [Inject]
@@ -40,17 +38,12 @@
 
         protected SystemMessageService systemMessageService = default;
         protected ProcessService processService = default;
-        protected Process process;
-        protected ProcessStartInfo data = default;
+        protected IntPtr processHeader;
         
         protected readonly string dependenciesPath;
         
         protected string pythonPath;
         protected string requirementsPath;
-        protected string[] ignoreErrorFields = new string[]
-        {
-            "WARNING"
-        };
 
         public virtual async Task<bool> TryRegister()
         {
@@ -113,24 +106,25 @@
                 var startupInfo = new  WindowsJobObjectApi.STARTUPINFO();
                 startupInfo.cb = Marshal.SizeOf(startupInfo);
                 var processInfo = new WindowsJobObjectApi.PROCESS_INFORMATION();
-                
+
                 bool success = WindowsJobObjectApi.CreateProcess(
-                    null,               // Путь к исполняемому файлу (null, так как указан в commandLine)
-                    commandLine,        // Командная строка с аргументами
-                    IntPtr.Zero,        // Атрибуты процесса (по умолчанию)
-                    IntPtr.Zero,        // Атрибуты потока (по умолчанию)
-                    false,              // Не наследовать дескрипторы
-                    0,                  // Флаги создания (по умолчанию)
-                    IntPtr.Zero,        // Среда окружения (по умолчанию)
-                    workingDir,         // Рабочий каталог
-                    ref startupInfo,    // Параметры запуска
-                    out processInfo     // Информация о запущенном процессе
+                    null,               // Path to executable (null, since specified in commandLine)
+                    commandLine,        // Command line with arguments
+                    IntPtr.Zero,        // Process attributes (default)
+                    IntPtr.Zero,        // Thread attributes (default)
+                    false,              // Do not inherit handles
+                    WindowsJobObjectApi.CREATE_NO_WINDOW, // Creation flags (default)
+                    IntPtr.Zero,        // Environment (default)
+                    workingDir,         // Working directory
+                    ref startupInfo,    // Startup parameters
+                    out processInfo     // Information about the running process
                 );
                 
                 if (success)
                 {
-                    Debug.Log("Процесс Python успешно запущен.");
-                    // Закрываем дескрипторы, чтобы избежать утечек ресурсов
+                    processHeader = processInfo.hProcess;
+                    processService.RegisterProcess(processHeader);
+
                     WindowsJobObjectApi.CloseHandle(processInfo.hProcess);
                     WindowsJobObjectApi.CloseHandle(processInfo.hThread);
                     return true;
@@ -138,7 +132,7 @@
                 else
                 {
                     int error = Marshal.GetLastWin32Error();
-                    Debug.LogError($"Не удалось запустить процесс. Код ошибки: {error}");
+                    Debug.LogError($"{string.Format(ERROR, error)}");
                     return false;
                 }
             });

@@ -14,7 +14,6 @@
         protected virtual void Construct(ProcessService _processService)
         {
             processService = _processService;
-            processService.RegisterProcess(process);
         }
         
         public PythonChecker(string _targetFolder, string[] _requiredFiles) : base(_targetFolder, _requiredFiles)
@@ -55,6 +54,7 @@
 
                 using (process = Process.Start(startInfo))
                 {
+                    processService.RegisterProcess(process);
                     output = process.StandardOutput.ReadToEnd();
                     process.WaitForExit();
 

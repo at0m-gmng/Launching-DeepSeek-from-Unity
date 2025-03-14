@@ -12,7 +12,6 @@
         protected virtual void Construct(ProcessService _processService)
         {
             processService = _processService;
-            processService.RegisterProcess(process);
         }
         
         protected ProcessService processService = default;
@@ -30,10 +29,9 @@
                 CreateNoWindow = true
             };
 
-            process = Process.Start(startInfo);
-            
-            using (process)
+            using (process = Process.Start(startInfo))
             {
+                processService.RegisterProcess(process);
                 await Task.Run(() =>
                 {
                     process?.WaitForExit();

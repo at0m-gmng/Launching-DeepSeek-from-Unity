@@ -3,11 +3,14 @@
     using System;
     using System.Diagnostics;
     using System.IO;
+    using System.Linq;
+    using System.Runtime.InteropServices;
     using System.Threading.Tasks;
     using Data;
     using GameResources.Features.SystemNotification.Scripts;
     using GameResources.Features.SystemNotification.Scripts.Interfaces;
     using GameResources.Services.Scripts;
+    using Microsoft.Win32;
     using ProcessController;
     using UnityEngine;
     using UnityEngine.Networking;
@@ -22,7 +25,6 @@
             systemMessageService = _systemMessageService;
             processService = _processService;
             systemMessageService.RegisterMessage(this);
-            processService.RegisterProcess(process);
         }
 
         public LocalServerLaunchControllerModel(string _serverFileName, string _serverURL, int _maxAttempts)
@@ -48,7 +50,7 @@
         
         protected string pythonPath;
         protected string scriptPath;
-        protected Process process;
+        protected IntPtr processHeader;
         protected ProcessStartInfo data = default;
         protected StatusResponse status = default;
         protected UnityWebRequest request = default;
@@ -72,7 +74,7 @@
                 return false;
             }
             
-            pythonPath = await FindPythonPath();
+            pythonPath = await GetPythonPathFromRegistry();
             
 
             if (string.IsNullOrEmpty(pythonPath))
@@ -91,31 +93,64 @@
 
         protected virtual void StartPythonScriptAsync()
         {
-            data = new ProcessStartInfo
-            {
-                FileName = pythonPath,
-                Arguments = $"\"{scriptPath}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+            string workingDir = Path.GetDirectoryName(scriptPath);
+            string commandLine = $"\"{pythonPath}\" \"{scriptPath}\"";
 
-            process = new Process { StartInfo = data, EnableRaisingEvents = true };
-    
-            process.ErrorDataReceived += errorHandler;
-            process.Exited += exitHandler;
+            var startupInfo = new  WindowsJobObjectApi.STARTUPINFO();
+            startupInfo.cb = Marshal.SizeOf(startupInfo);
+            var processInfo = new WindowsJobObjectApi.PROCESS_INFORMATION();
+
+            bool success = WindowsJobObjectApi.CreateProcess(
+                null, // Application is specified via command line
+                commandLine, // Command line
+                IntPtr.Zero, // Process security attributes
+                IntPtr.Zero, // Thread security attributes
+                false, // Do not inherit handles
+                WindowsJobObjectApi.CREATE_NO_WINDOW, // Creation flags
+                IntPtr.Zero, // Environment
+                workingDir, // Working directory
+                ref startupInfo, // STARTUPINFO
+                out processInfo // PROCESS_INFORMATION
+            );
+            
+            if (success)
+            {
+                processHeader = processInfo.hProcess;
+                processService.RegisterProcess(processHeader);
                 
-            try
-            {
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
+                Debug.LogError($"Server Success Launch");
             }
-            catch (Exception ex)
+            else
             {
-                Debug.LogError($"Error starting Python process: {ex.Message}");
+                int error = Marshal.GetLastWin32Error();
+                Debug.LogError($"Error starting process. Error code: {error}");
             }
+            
+            // data = new ProcessStartInfo
+            // {
+            //     FileName = pythonPath,
+            //     Arguments = $"\"{scriptPath}\"",
+            //     RedirectStandardOutput = true,
+            //     RedirectStandardError = true,
+            //     UseShellExecute = false,
+            //     CreateNoWindow = true
+            // };
+            //
+            // process = new Process { StartInfo = data, EnableRaisingEvents = true };
+            //
+            // process.ErrorDataReceived += errorHandler;
+            // process.Exited += exitHandler;
+            //     
+            // try
+            // {
+            //     process.Start();
+            //     process.BeginOutputReadLine();
+            //     process.BeginErrorReadLine();
+            // }
+            // catch (Exception ex)
+            // {
+            //     Debug.LogError($"Error starting Python process: {ex.Message}");
+            // }
         }
 
         protected async Task<bool> PollServerStatusAsync()
@@ -163,40 +198,32 @@
             Debug.LogError(SERVER_RUNNING_FAILED);
             return false;
         }
-
-        protected async Task<string> FindPythonPath()
+        
+        protected async Task<string> GetPythonPathFromRegistry()
         {
             return await Task.Run(() =>
             {
-                data = new ProcessStartInfo
+                try
                 {
-                    FileName = "where",
-                    Arguments = "python",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                process = new Process { StartInfo = data };
-
-                using (process)
-                {
-                    process.Start();
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-
-                    if (process.ExitCode == 0)
+                    using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Python\PythonCore"))
                     {
-                        return output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)[0];
-                    }
-                    else
-                    {
-                        Debug.LogError(string.Format(ERROR, error));
-                        return null;
+                        var versions = key?.GetSubKeyNames();
+                        var latestVersion = versions?.OrderByDescending(v => v).FirstOrDefault();
+                        if (latestVersion != null)
+                        {
+                            using (var installKey = key.OpenSubKey($@"{latestVersion}\InstallPath"))
+                            {
+                                return installKey?.GetValue("ExecutablePath")?.ToString();
+                            }
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Ошибка чтения реестра: {ex.Message}");
+                }
+
+                return null;
             });
         }
         
@@ -216,8 +243,8 @@
         protected virtual void Unsibscribe(object sender, EventArgs eventArgs)
         {
             Debug.LogError("Unsibscribe");
-            process.ErrorDataReceived -= errorHandler;
-            process.Exited -= exitHandler;
+            // process.ErrorDataReceived -= errorHandler;
+            // process.Exited -= exitHandler;
         }
         
         protected virtual void CheckErrors(object sender, DataReceivedEventArgs e)
@@ -230,8 +257,6 @@
         }
         
         
-        public virtual async void OnApplicationQuit() => await ShutdownPythonServerAsync();
-
         private async Task ShutdownPythonServerAsync()
         {
             request = UnityWebRequest.PostWwwForm(SHUTDOWN_URL, "");
