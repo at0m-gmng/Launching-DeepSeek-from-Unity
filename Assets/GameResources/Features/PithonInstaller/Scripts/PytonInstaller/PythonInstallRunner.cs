@@ -1,9 +1,9 @@
-﻿namespace GameResources.Features.PitonIntaller.Scripts.PytonInstaller
+﻿namespace GameResources.Features.PithonInstaller.Scripts.PytonInstaller
 {
     using System.Diagnostics;
     using System.Threading.Tasks;
-    using DownloadedFileRunner.Scripts;
-    using ProcessController;
+    using GameResources.Features.DownloadedFileRunner.Scripts;
+    using GameResources.Features.ProcessController;
     using Zenject;
 
     public class PythonInstallRunner : BaseFileRunner

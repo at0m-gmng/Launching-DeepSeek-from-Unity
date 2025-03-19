@@ -1,9 +1,9 @@
-﻿namespace GameResources.Features.PitonIntaller.Scripts.Controllers
+﻿namespace GameResources.Features.PithonInstaller.Scripts.Controllers
 {
     using System.Threading.Tasks;
+    using GameResources.Features.InstallService.Scripts;
     using GameResources.Services.Scripts;
-    using InstallService.Scripts;
-    using PytonChecker;
+    using PythonChecker;
     using PytonDownloader;
     using PytonInstaller;
     using UnityEngine;
@@ -18,11 +18,11 @@
 
         public virtual async Task<bool> TryRegister()
         {
-            fileChecker = Container.Instantiate<PythonChecker>(new object[]
-            {
-                string.Empty, 
+            fileChecker = new PythonChecker
+            (
+                Application.streamingAssetsPath, 
                 RequiredFiles
-            });
+            );
             
             fileDownloader = Container.Instantiate<PythonDownloader>();
             installRunner = Container.Instantiate<PythonInstallRunner>();
