@@ -1,6 +1,7 @@
 ﻿namespace GameResources.Features.FileChecker.Scripts
 {
     using System.IO;
+    using System.Threading.Tasks;
     using UnityEngine;
 
     public class BaseFileCheker : IComponentChecker
@@ -10,14 +11,17 @@
             targetFolder = _targetFolder;
             requiredFiles = _requiredFiles;
         }
+
+        public string FoundPath => foundPath;
         
-        protected string targetFolder;
-        protected string[] requiredFiles;
+        protected string targetFolder = string.Empty;
+        protected string foundPath = string.Empty;
+        protected string[] requiredFiles = default;
 
         /// <summary>
         /// Checks if all files (named fileNames) exist in the specified folder.
         /// </summary>
-        public virtual bool IsContains()
+        public virtual async Task<bool> IsContains()
         {
             for (int i = 0; i < requiredFiles.Length; i++)
             {
