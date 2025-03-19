@@ -46,5 +46,7 @@
                 jobHandle = IntPtr.Zero;
             }
         }
+
+        protected virtual void OnApplicationQuit() => Dispose();
     }
 }

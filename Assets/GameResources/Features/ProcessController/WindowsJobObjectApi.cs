@@ -77,13 +77,13 @@
 
         #region Windows API
 
-        private enum JobObjectInfoType
+        public enum JobObjectInfoType
         {
             ExtendedLimitInformation = 9
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+        public struct JOBOBJECT_BASIC_LIMIT_INFORMATION
         {
             public long PerProcessUserTimeLimit;
             public long PerJobUserTimeLimit;
@@ -97,7 +97,7 @@
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct IO_COUNTERS
+        public struct IO_COUNTERS
         {
             public ulong ReadOperationCount;
             public ulong WriteOperationCount;
@@ -108,7 +108,7 @@
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+        public struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
         {
             public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
             public IO_COUNTERS IoInfo;
@@ -142,6 +142,14 @@
         }
         
         [StructLayout(LayoutKind.Sequential)]
+        public struct SECURITY_ATTRIBUTES
+        {
+            public int nLength;
+            public IntPtr lpSecurityDescriptor;
+            public bool bInheritHandle;
+        }
+        
+        [StructLayout(LayoutKind.Sequential)]
         public struct PROCESS_INFORMATION
         {
             public IntPtr hProcess;
@@ -151,6 +159,9 @@
         }
         
         public const uint CREATE_NO_WINDOW = 0x08000000;
+        public const uint STARTF_USESTDHANDLES = 0x00000100;
+        public const uint INFINITE = 0xFFFFFFFF;       // Бесконечное ожидание
+        public const uint WAIT_OBJECT_0 = 0x00000000;  // Процесс завершился
         
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
@@ -176,6 +187,19 @@
             string lpCurrentDirectory,
             [In] ref STARTUPINFO lpStartupInfo,
             out PROCESS_INFORMATION lpProcessInformation);
+        
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool CreatePipe(
+            out IntPtr hReadPipe,
+            out IntPtr hWritePipe,
+            ref SECURITY_ATTRIBUTES lpPipeAttributes,
+            int nSize);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+        
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
         
         #endregion
     }
