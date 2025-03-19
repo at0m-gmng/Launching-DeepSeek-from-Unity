@@ -2,7 +2,6 @@
 {
     using System;
     using System.IO;
-    using System.Linq;
     using System.Runtime.InteropServices;
     using System.Threading.Tasks;
     using GameResources.Features.SystemNotification.Scripts;
@@ -12,9 +11,8 @@
     using UnityEngine;
     using Zenject;
     using Debug = UnityEngine.Debug;
-    using Microsoft.Win32;
 
-    public class PythonDependencyInstallController: ISystemNotification, IService
+    public class PythonDependencyInstallController: IProgressSystemNotification, IService
     {
         [Inject]
         protected virtual void Construct(SystemMessageService _systemMessageService, ProcessService _processService)
@@ -25,9 +23,10 @@
         }
 
         [Inject]
-        public PythonDependencyInstallController(string _dependenciesPath)
+        public PythonDependencyInstallController(string _dependenciesPath, string _pythonPath)
         {
             dependenciesPath = _dependenciesPath;
+            pythonPath = _pythonPath;
         }
      
         protected const string INSTALL_DEPENDENCIES = "Installing dependencies...";
@@ -35,14 +34,15 @@
         protected const string ERROR = "Error: {0}";
         
         public event Action<string> onMessage = delegate { };
+        public event Action<string, float> onMessageProgress = delegate { };
 
         protected SystemMessageService systemMessageService = default;
         protected ProcessService processService = default;
         protected IntPtr processHeader;
         
         protected readonly string dependenciesPath;
-        
-        protected string pythonPath;
+        protected readonly string pythonPath;
+
         protected string requirementsPath;
 
         public virtual async Task<bool> TryRegister()
@@ -55,45 +55,18 @@
                 return false;
             }
 
-            pythonPath = await GetPythonPathFromRegistry();
-            Debug.LogError($"pythonPath {pythonPath}");
-            Debug.LogError($"requirementsPath {requirementsPath}");
-
-            if (string.IsNullOrEmpty(pythonPath))
+            onMessageProgress("Start install dependencies", 0f);
+            await Task.Delay(100);
+            
+            if (await InstallDependencies())
             {
-                Debug.LogError("Python not found on the system.");
-                return false;
+                onMessageProgress("Dependencies installation complete", 1f);
+                return true;
             }
-
-            return await InstallDependencies();
-        }
-        
-        protected async Task<string> GetPythonPathFromRegistry()
-        {
-            return await Task.Run(() =>
+            else
             {
-                try
-                {
-                    using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Python\PythonCore"))
-                    {
-                        var versions = key?.GetSubKeyNames();
-                        var latestVersion = versions?.OrderByDescending(v => v).FirstOrDefault();
-                        if (latestVersion != null)
-                        {
-                            using (var installKey = key.OpenSubKey($@"{latestVersion}\InstallPath"))
-                            {
-                                return installKey?.GetValue("ExecutablePath")?.ToString();
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"Ошибка чтения реестра: {ex.Message}");
-                }
-
-                return null;
-            });
+                return false;
+            } 
         }
 
         protected virtual async Task<bool> InstallDependencies()
@@ -120,14 +93,36 @@
                     out processInfo     // Information about the running process
                 );
                 
+                processHeader = processInfo.hProcess;
+                processService.RegisterProcess(processHeader);
+                
                 if (success)
                 {
-                    processHeader = processInfo.hProcess;
-                    processService.RegisterProcess(processHeader);
+                    // Ожидание завершения процесса
+                    uint result = WindowsJobObjectApi.WaitForSingleObject(processInfo.hProcess, WindowsJobObjectApi.INFINITE);
 
-                    WindowsJobObjectApi.CloseHandle(processInfo.hProcess);
-                    WindowsJobObjectApi.CloseHandle(processInfo.hThread);
-                    return true;
+                    if (result == WindowsJobObjectApi.WAIT_OBJECT_0)
+                    {
+                        // Процесс завершился успешно
+                        uint exitCode;
+                        WindowsJobObjectApi.GetExitCodeProcess(processInfo.hProcess, out exitCode);
+
+                        if (exitCode == 0)
+                        {
+                            Debug.LogError("Процесс завершился успешно");
+                            return true;
+                        }
+                        else
+                        {
+                            Debug.LogError($"Процесс завершился с ошибкой, код выхода: {exitCode}");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogError($"WaitForSingleObject завершился с ошибкой, результат: {result}");
+                        return false;
+                    }
                 }
                 else
                 {
