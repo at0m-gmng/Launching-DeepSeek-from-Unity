@@ -16,6 +16,7 @@
         
         public bool IsFullCleaningField = true;
         public Tween CurrentTween { get; protected set; } = null;
+        
 
         protected Text text = default;
         protected float timeShowingText = default;
@@ -33,6 +34,8 @@
                 PlayNext();
             }
         }
+
+        public bool IsContains(string newText) => textQueue.Contains(newText);
 
         protected virtual void PlayNext()
         {

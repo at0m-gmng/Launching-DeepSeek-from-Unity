@@ -29,7 +29,6 @@
             base.Start();
         }
 
-
         protected override void SubscribeToMessage(ISystemNotification message)
         {
             if (!subscribedMessages.Contains(message))
@@ -63,25 +62,38 @@
 
         protected virtual void OnMessageUpdate(string newText, float progress)
         {
-            if (progressSlider != null)
-            {
-                progressSlider.value = progress;
-            }
-
-            StartCoroutine(WaitWhileEndAnimation(newText));
+            OnMessageUpdate(newText);
+            StartCoroutine(WaitWhileEndAnimation(progress));
+        }
+        
+        protected virtual IEnumerator WaitWhileEndAnimation(float progress)
+        {
+            yield return null;
+            UpdateSliderValue(progress);
         }
 
-        protected IEnumerator WaitWhileEndAnimation(string newText)
+        protected virtual void UpdateSliderValue(float progress)
         {
-            yield return new WaitWhile(() 
-                => simpleTextSequenceAnimator.CurrentTween != null || simpleTextSequenceAnimator.CurrentTween.IsActive());
-            progressText.text = newText;
+            if (progressSlider != null)
+            {
+                if (progress > progressSlider.value)
+                {
+                    progressSlider.DOValue(progress, 1f);
+                }
+                else
+                {
+                    progressSlider.value = progress;
+                }
+            }
         }
 
         protected override void OnMessageUpdate(string newText)
         {
-            simpleTextSequenceAnimator.IsFullCleaningField = true;
-            simpleTextSequenceAnimator.EnqueueTextAnimation(newText);
+            if (!simpleTextSequenceAnimator.IsContains(newText))
+            {
+                simpleTextSequenceAnimator.IsFullCleaningField = true;
+                simpleTextSequenceAnimator.EnqueueTextAnimation(newText);
+            }
         }
     }
 }

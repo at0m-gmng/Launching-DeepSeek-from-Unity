@@ -16,7 +16,6 @@
 
         protected virtual async void Start()
         {
-            Debug.LogError($"Services {services.Count}");
             for (int i = 0; i < services.Count; i++)
             {
                 if (!await services[i].TryRegister())
