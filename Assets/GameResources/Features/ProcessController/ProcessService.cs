@@ -34,6 +34,9 @@
         public bool RegisterProcess(Process process) 
             => Environment.OSVersion.Platform == PlatformID.Win32NT && process != null &&
                !process.HasExited && WindowsJobObjectApi.AssignProcessToJob(jobHandle, process);
+        public bool RegisterProcess(IntPtr processHandle) 
+            => Environment.OSVersion.Platform == PlatformID.Win32NT &&  
+               WindowsJobObjectApi.AssignProcessToJob(jobHandle, processHandle);
 
         protected virtual void Dispose()
         {
@@ -43,5 +46,7 @@
                 jobHandle = IntPtr.Zero;
             }
         }
+
+        protected virtual void OnApplicationQuit() => Dispose();
     }
 }

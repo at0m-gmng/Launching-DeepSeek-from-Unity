@@ -26,10 +26,23 @@
         public event Action<string, float> onMessageProgress = delegate {  };
 
         public virtual string DownloadedSuccess { get; protected set; } = "Download complete";
-        public virtual string DownloadedProgress { get; protected set; } = "Downloads: {0}";
+        public virtual string DownloadedProgress { get; protected set; } = "Download";
 
         public virtual string InstalledPath { get; protected set; } = "NewFile_MascotProject";
 
+        protected long Total
+        {
+            get => long.Parse(PlayerPrefs.GetString("Downloaded" + $"{this.GetType()}", default));
+            set
+            {
+                if (value != total)
+                {
+                    total = value;
+                    PlayerPrefs.SetString("Downloaded" + $"{this.GetType()}", total.ToString());
+                }
+            }
+        }
+        
         protected HttpResponseMessage response = default;
         protected HttpClient client = default;
         protected Stream contentStream = default;
@@ -54,20 +67,16 @@
                 if (File.Exists(destinationPath))
                 {
                     existingLength = new FileInfo(destinationPath).Length;
-                    UnityEngine.Debug.LogError($"An existing file was found, size = {existingLength} bytes.");
+                    Debug.LogError($"An existing file was found, size = {existingLength} bytes.");
 
                     InitNewHandler(true);
-                    total = await GetExpectedFileSizeAsync(url, cancellationToken);
+                    Total = await GetExpectedFileSizeAsync(url, cancellationToken);
 
-                    if (total != -1 && existingLength == total)
+                    if (Total != -1 && existingLength == Total)
                     {
-                        UnityEngine.Debug.LogError("File already downloaded. Skipping download.");
+                        Debug.LogError("File already downloaded. Skipping download.");
                         onMessageProgress(string.Empty, 1f);
                         return true;
-                    }
-                    else
-                    {
-                        File.Delete(destinationPath);
                     }
                 }
 
@@ -109,18 +118,18 @@
 
                         if (existingLength > 0 && response.StatusCode == System.Net.HttpStatusCode.PartialContent && response.Content.Headers.ContentLength.HasValue)
                         {
-                            total = existingLength + response.Content.Headers.ContentLength.Value;
+                            Total = existingLength + response.Content.Headers.ContentLength.Value;
                         }
                         else
                         {
-                            total = await GetExpectedFileSizeAsync(url, cancellationToken);
-                            if (total == -1)
+                            Total = await GetExpectedFileSizeAsync(url, cancellationToken);
+                            if (Total == -1)
                             {
-                                total = response.Content.Headers.ContentLength ?? -1L;
+                                Total = response.Content.Headers.ContentLength ?? -1L;
                             }
                         }
-                        isRequiredReportProgress = total != -1;
-                        onMessage($"Total file size: {total} bytes.");
+                        isRequiredReportProgress = Total != -1;
+                        onMessage($"Total file size: {Total} bytes.");
 
                         using (fileStream = new FileStream(destinationPath, existingLength > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
                         {
@@ -131,6 +140,7 @@
                                 isMoreToRead = true;
                                 do
                                 {
+                                    cancellationToken.ThrowIfCancellationRequested();
                                     bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
                                     if (bytesRead == 0)
                                     {
@@ -140,11 +150,11 @@
                                     }
                                     await fileStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
                                     totalRead += bytesRead;
+                                    progressPercentage = (float)totalRead / Total;
 
                                     if (isRequiredReportProgress)
                                     {
-                                        progressPercentage = (float)totalRead / total;
-                                        onMessageProgress(string.Format(DownloadedProgress, (progressPercentage * 100).ToString("0.0")), progressPercentage);
+                                        onMessageProgress(DownloadedProgress, progressPercentage);
                                     }
                                 }
                                 while (isMoreToRead);
@@ -185,15 +195,17 @@
 
                     Debug.LogError($"Attempting to download installer: {attempts} of {maxAttempts}");
                     onMessage($"Attempting to download installer: {attempts} of {maxAttempts}");
+
                     if (!await DownloadFileAsync(downloadUrl, tempFilePath, cancellationToken))
                     {
                         tempFilePath = string.Empty;
                     }
                     else
                     {
-                        valid = IsZipFileValid(tempFilePath);   
+                        valid = IsDownloadSuccess(tempFilePath);   
                     }
                 }
+                
                 if (!valid)
                 {
                     tempFilePath = string.Empty;
@@ -211,13 +223,9 @@
         /// Check the integrity of the ZIP file.
         /// If the archive is corrupted (e.g. End of Central Directory not found), an exception will be thrown.
         /// </summary>
-        protected virtual bool IsZipFileValid(string filePath)
+        public virtual bool IsZipFileValid(string filePath)
         {
-            // If the file does not have a .zip extension, skip the integrity check
-            if (Path.GetExtension(filePath).ToLower() != ".zip")
-            {
-                return true;
-            }
+            if (!IsDownloadSuccess(filePath)) return false;
 
             try
             {
@@ -237,16 +245,27 @@
             }
         }
 
+        public virtual bool IsDownloadSuccess(string filePath)
+        {
+            FileInfo fileInfo = new FileInfo(filePath);
+            if (Total != -1 && fileInfo.Length < Total)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         protected virtual async Task<long> GetExpectedFileSizeAsync(string url, CancellationToken cancellationToken)
         {
             return await Task.Run(async () =>
             {
                 try
                 {
-                    using (var headClient = new HttpClient(handler))
+                    using (HttpClient headClient = new HttpClient( new HttpClientHandler()))
                     {
-                        var headRequest = new HttpRequestMessage(HttpMethod.Head, url);
-                        var headResponse = await headClient.SendAsync(headRequest, cancellationToken);
+                        HttpRequestMessage headRequest = new HttpRequestMessage(HttpMethod.Head, url);
+                        HttpResponseMessage headResponse = await headClient.SendAsync(headRequest, cancellationToken);
             
                         if (headResponse.StatusCode == System.Net.HttpStatusCode.OK)
                         {

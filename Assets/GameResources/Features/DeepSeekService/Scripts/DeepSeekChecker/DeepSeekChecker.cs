@@ -1,12 +1,13 @@
 ﻿namespace GameResources.Features.DeepSeekService.Scripts.DeepSeekChecker
 {
     using System.IO;
+    using System.Threading.Tasks;
 
     public class DeepSeekChecker : GameResources.Features.FileChecker.Scripts.BaseFileCheker
     {
         public DeepSeekChecker(string _targetFolder, string[] _requiredFiles) : base(_targetFolder, _requiredFiles) { }
 
-        public override bool IsContains() => IsContainsInStreamingAssets() | base.IsContains();
+        public override async Task<bool> IsContains() => IsContainsInStreamingAssets() | await base.IsContains();
 
         /// <summary>
         /// Checks if all files (named requiredFiles) exist in the StreamingAssets directory.

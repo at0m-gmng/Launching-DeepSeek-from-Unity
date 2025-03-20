@@ -41,18 +41,19 @@
 
         public virtual async Task<bool> InitInstall()
         {
+            bool isComplete = false;
             await Task.Delay(delayTicks);
             try
             {
-                await installController.InstallAsync(gameObject.GetCancellationTokenOnDestroy());
+                isComplete =  await installController.InstallAsync(gameObject.GetCancellationTokenOnDestroy());
             }
             catch (Exception e)
             {
-                Debug.LogError($"InitInstall with Error: {e}");
+                Debug.LogError($"InitInstall with Error: {e}", gameObject);
                 return false;
             }
 
-            return true;
+            return isComplete;
         }
     }
 }

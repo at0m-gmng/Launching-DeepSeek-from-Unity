@@ -8,7 +8,7 @@
     public abstract class SystemNotificationView : MonoBehaviour
     {
         [Inject]
-        public virtual void Construct(SystemMessageService _messageManager)
+        protected virtual void Construct(SystemMessageService _messageManager)
         {
             messageManager = _messageManager;
         }
@@ -21,7 +21,6 @@
             messageManager.onMessageAdded += OnMessageAdded;
             messageManager.onMessageRemoved += OnMessageRemoved;
 
-            Debug.LogError($"messageManager.Messages {messageManager.Messages.Count}");
             foreach (ISystemNotification message in messageManager.Messages)
             {
                 SubscribeToMessage(message);

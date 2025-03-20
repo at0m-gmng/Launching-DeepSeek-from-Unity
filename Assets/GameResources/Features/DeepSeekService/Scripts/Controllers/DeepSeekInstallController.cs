@@ -17,7 +17,9 @@
         
         protected override string FileNotFind { get; set; } = "DeepSeek model not found. Starting to download installer...";
         protected override string InstallerDownloaded { get; set; } = "Model downloaded. Starting unpacking...";
-        protected override string InstallerEnded { get; set; } = "DeepSeek unboxing complete.";
-        protected override string ProgrammInstalled { get; set; } = "DeepSeek found.";
+        protected override string InstallerEnded { get; set; } = "DeepSeek unboxing complete";
+        protected override string ProgrammInstalled { get; set; } = "DeepSeek found";
+        
+        protected override string ProgrammStartInstalled { get; set; } = "Starting installation DeepSeek";
     }
 }

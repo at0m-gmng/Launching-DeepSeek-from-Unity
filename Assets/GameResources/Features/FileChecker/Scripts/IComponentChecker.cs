@@ -1,7 +1,9 @@
 ﻿namespace GameResources.Features.FileChecker.Scripts
 {
+    using System.Threading.Tasks;
+
     public interface IComponentChecker
     {
-        public bool IsContains();
+        public Task<bool> IsContains();
     }
 }

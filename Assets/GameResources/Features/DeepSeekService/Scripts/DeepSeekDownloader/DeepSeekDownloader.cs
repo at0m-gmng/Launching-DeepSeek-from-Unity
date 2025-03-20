@@ -30,5 +30,17 @@
             }
             return tempFilePath;
         }
+
+        public override bool IsDownloadSuccess(string filePath)
+        {
+            
+            FileInfo fileInfo = new FileInfo(filePath);
+            if (Total != -1 && fileInfo.Length < Total)
+            {
+                return false;
+            }
+
+            return base.IsZipFileValid(filePath);
+        }
     }
 }

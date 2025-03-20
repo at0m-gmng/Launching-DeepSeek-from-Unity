@@ -29,7 +29,7 @@
             {
                 messages.Add(message);
                 onMessageAdded?.Invoke(message);
-                Debug.LogError($"Register {message.GetType()}");
+                // Debug.LogError($"Register {message.GetType()}");
             }
         }
 
@@ -38,7 +38,7 @@
             if (messages.Remove(message))
             {
                 onMessageRemoved?.Invoke(message);
-                Debug.LogError($"Removed {message.GetType()}");
+                // Debug.LogError($"Removed {message.GetType()}");
             }
         }
 
