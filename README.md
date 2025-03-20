@@ -5,7 +5,7 @@
 1) Download the AI model DeepSeek from the link:
    https://huggingface.co/unsloth/DeepSeek-R1-Distill-Llama-8B/tree/main
 2) Place the downloaded files in StreammingAsssets/DeepSeek
-3) Launch the Editor Application (at the moment the build is not supported)
+3) Launch the Editor Application or make build
 
 ## How does this work?
 
@@ -20,3 +20,11 @@
 - The model is not configured, since the main task was to launch the model from Unity. On weak devices, answers to even banal questions are generated for up to 10 minutes. The answer includes "DeepThink", so if you change the number of tokens in the .py files, take this into account.
 - At the time of writing the readme, the functionality is in the process of fixing errors.
 - If you have any edits or suggestions, you can contact me and we will make this project better.
+
+
+<div align="center">
+    <img src="unity.png" >
+    <p>Demonstration of work in Unity</p>
+    <img src="cmd.png" >
+    <p>Demonstration of the work of cmd.exe</p>
+</div>
