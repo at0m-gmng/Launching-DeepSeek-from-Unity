@@ -1,10 +1,12 @@
 ﻿namespace GameResources.Features.LocalServer.Scripts.Services
 {
     using System;
-    using System.Diagnostics;
+    using System.Collections.Concurrent;
     using System.IO;
     using System.Linq;
     using System.Runtime.InteropServices;
+    using System.Text.RegularExpressions;
+    using System.Threading;
     using System.Threading.Tasks;
     using Data;
     using GameResources.Features.SystemNotification.Scripts;
@@ -16,8 +18,9 @@
     using UnityEngine.Networking;
     using Zenject;
     using Debug = UnityEngine.Debug;
+    using UniTask = Cysharp.Threading.Tasks.UniTask;
 
-    public class LocalServerLaunchControllerModel: ISystemNotification, IService
+    public class LocalServerLaunchControllerModel: IProgressSystemNotification, IService, IDisposable
     {
         [Inject]
         protected virtual void Construct(SystemMessageService _systemMessageService, ProcessService _processService)
@@ -36,10 +39,11 @@
         
         protected const string SERVER_RUNNING_SUCCESS = "DeepSeek server is running!";
         protected const string SERVER_RUNNING_FAILED = "DeepSeek server failed to start or timed out!";
+        protected const string LOADING_CHECKPOINT_SHARDS = "Loading checkpoint shards:";
         protected const string ERROR = "Error: {0}";
-        protected const string SHUTDOWN_URL = "http://127.0.0.1:5000/shutdown";
         
         public event Action<string> onMessage = delegate { };
+        public event Action<string, float> onMessageProgress = delegate { };
 
         protected SystemMessageService systemMessageService = default;
         protected ProcessService processService = default;
@@ -50,8 +54,11 @@
         
         protected string pythonPath;
         protected string scriptPath;
+        protected string logData;
         protected IntPtr processHeader;
-        protected ProcessStartInfo data = default;
+        protected Match match;
+        protected CancellationTokenSource cancellationToken = default;
+        protected WindowsJobObjectApi.PROCESS_INFORMATION processInfo = default;
         protected StatusResponse status = default;
         protected UnityWebRequest request = default;
         protected UnityWebRequestAsyncOperation operation = default;
@@ -60,12 +67,19 @@
             "Error",
             "error"
         };
+        protected string[] serverLogFields = new string[]
+        {
+            "Loading checkpoint shards"
+        };
         
-        protected DataReceivedEventHandler errorHandler;
-        protected EventHandler exitHandler;
+        IntPtr stdInputHandle;
+        IntPtr stdoutRead, stdoutWrite;
+        IntPtr stderrRead, stderrWrite;
         
         public virtual async Task<bool> TryRegister()
         {
+            cancellationToken = new CancellationTokenSource();
+
             scriptPath = Path.Combine(Application.streamingAssetsPath, serverFileName);
 
             if (!File.Exists(scriptPath))
@@ -75,7 +89,6 @@
             }
             
             pythonPath = await GetPythonPathFromRegistry();
-            
 
             if (string.IsNullOrEmpty(pythonPath))
             {
@@ -83,77 +96,147 @@
                 return false;
             }
 
-            exitHandler = new EventHandler(Unsibscribe);
-            errorHandler = new DataReceivedEventHandler(CheckErrors);
-            
             StartPythonScriptAsync();
-
+            
             return await PollServerStatusAsync();
         }
 
-        protected virtual void StartPythonScriptAsync()
+        protected FileStream nulInputStream;
+
+        protected virtual async Task<bool> StartPythonScriptAsync()
         {
-            string workingDir = Path.GetDirectoryName(scriptPath);
-            string commandLine = $"\"{pythonPath}\" \"{scriptPath}\"";
-
-            var startupInfo = new  WindowsJobObjectApi.STARTUPINFO();
-            startupInfo.cb = Marshal.SizeOf(startupInfo);
-            var processInfo = new WindowsJobObjectApi.PROCESS_INFORMATION();
-
-            bool success = WindowsJobObjectApi.CreateProcess(
-                null, // Application is specified via command line
-                commandLine, // Command line
-                IntPtr.Zero, // Process security attributes
-                IntPtr.Zero, // Thread security attributes
-                false, // Do not inherit handles
-                WindowsJobObjectApi.CREATE_NO_WINDOW, // Creation flags
-                IntPtr.Zero, // Environment
-                workingDir, // Working directory
-                ref startupInfo, // STARTUPINFO
-                out processInfo // PROCESS_INFORMATION
-            );
-            
-            if (success)
+            return await Task<bool>.Run(() =>
             {
+                string workingDir = Path.GetDirectoryName(scriptPath);
+                string commandLine = $"\"{pythonPath}\" \"{scriptPath}\"";
+
+                #region Output
+
+                // Create a SECURITY_ATTRIBUTES structure for inherited descriptors
+                WindowsJobObjectApi.SECURITY_ATTRIBUTES sa = new WindowsJobObjectApi.SECURITY_ATTRIBUTES();
+                sa.nLength = Marshal.SizeOf(typeof(WindowsJobObjectApi.SECURITY_ATTRIBUTES));
+                sa.bInheritHandle = true;
+                sa.lpSecurityDescriptor = IntPtr.Zero;
+
+                // Create pipes to redirect stdout and stderr
+                try
+                {
+                    nulInputStream = new FileStream("NUL", FileMode.Open, FileAccess.Read);
+                }
+                catch(Exception ex)
+                {
+                    Debug.LogError("Failed to open NUL device for stdin: " + ex.Message);
+                    return false;
+                }
+                stdInputHandle = nulInputStream.SafeFileHandle.DangerousGetHandle();
+  
+                if (!WindowsJobObjectApi.CreatePipe(out stdoutRead, out stdoutWrite, ref sa, 0))
+                {
+                    Debug.LogError("Failed to create pipe for stdout.");
+                    return false;
+                }
+
+                if (!WindowsJobObjectApi.CreatePipe(out stderrRead, out stderrWrite, ref sa, 0))
+                {
+                    Debug.LogError("Failed to create pipe for stderr.");
+                    return false;
+                }
+
+                #endregion
+
+                WindowsJobObjectApi.STARTUPINFO startupInfo = new WindowsJobObjectApi.STARTUPINFO();
+                startupInfo.cb = Marshal.SizeOf(startupInfo);
+                startupInfo.hStdInput = stdInputHandle;
+                startupInfo.hStdOutput = stdoutWrite;
+                startupInfo.hStdError = stderrWrite;
+                startupInfo.dwFlags |= (int)WindowsJobObjectApi.STARTF_USESTDHANDLES;
+                
+                bool success = WindowsJobObjectApi.CreateProcess(
+                    null, // Application is specified via command line
+                    commandLine, // Command line
+                    IntPtr.Zero, // Process security attributes
+                    IntPtr.Zero, // Thread security attributes
+                    true, // Do not inherit handles
+                    WindowsJobObjectApi.CREATE_NO_WINDOW, // Creation flags
+                    IntPtr.Zero, // Environment
+                    workingDir, // Working directory
+                    ref startupInfo, // STARTUPINFO
+                    out processInfo // PROCESS_INFORMATION
+                );
+
                 processHeader = processInfo.hProcess;
                 processService.RegisterProcess(processHeader);
                 
-                Debug.LogError($"Server Success Launch");
-            }
-            else
+                Task.Run(() => ReadPipe(stdoutRead));
+                Task.Run(() => ReadPipe(stderrRead));
+
+                if (success)
+                {
+                    WindowsJobObjectApi.WaitForSingleObject(processInfo.hProcess, WindowsJobObjectApi.INFINITE);
+                    WindowsJobObjectApi.GetExitCodeProcess(processInfo.hProcess, out uint exitCode);
+                    Debug.Log($"The script ended with the code: {exitCode}");
+                }
+                else
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    Debug.LogError($"Error starting process. Error code: {error}");
+                }
+
+                processService.RegisterProcess(stdoutRead);
+                processService.RegisterProcess(stderrRead);
+                processService.RegisterProcess(stdoutWrite);
+                processService.RegisterProcess(stderrWrite);
+                return success;
+            });
+        }
+        
+        protected virtual async Task ReadPipe(IntPtr pipeHandle)
+        {
+            try
             {
-                int error = Marshal.GetLastWin32Error();
-                Debug.LogError($"Error starting process. Error code: {error}");
+                FileStream fs = new FileStream
+                (
+                    new Microsoft.Win32.SafeHandles.SafeFileHandle(pipeHandle, false),
+                    FileAccess.Read,
+                    1024,
+                    isAsync: true
+                );
+                using (fs)
+                using (StreamReader reader = new StreamReader(fs))
+                {
+                    while (!cancellationToken.IsCancellationRequested && (logData = await reader.ReadLineAsync()) != null)
+                    {
+                        await UniTask.SwitchToMainThread(cancellationToken.Token);
+
+                        if (IsContainsString(logData, ignoreErrorFields))
+                        {
+                            Debug.LogError($"{string.Format(ERROR, logData)}");
+                        }
+                        else if (IsContainsString(logData, serverLogFields))
+                        {
+                            match = Regex.Match(logData, @"(\d+)%");
+                            if (int.TryParse(match.Groups[1].Value, out int progressValue))
+                            {
+                                onMessageProgress(LOADING_CHECKPOINT_SHARDS, progressValue / 100.0f);
+                            }
+                        }
+                    }
+                }
             }
-            
-            // data = new ProcessStartInfo
-            // {
-            //     FileName = pythonPath,
-            //     Arguments = $"\"{scriptPath}\"",
-            //     RedirectStandardOutput = true,
-            //     RedirectStandardError = true,
-            //     UseShellExecute = false,
-            //     CreateNoWindow = true
-            // };
-            //
-            // process = new Process { StartInfo = data, EnableRaisingEvents = true };
-            //
-            // process.ErrorDataReceived += errorHandler;
-            // process.Exited += exitHandler;
-            //     
-            // try
-            // {
-            //     process.Start();
-            //     process.BeginOutputReadLine();
-            //     process.BeginErrorReadLine();
-            // }
-            // catch (Exception ex)
-            // {
-            //     Debug.LogError($"Error starting Python process: {ex.Message}");
-            // }
+            catch (Exception e)
+            {
+                Debug.LogError($"Read pipe with еrror //=> {e}");
+            }
+            finally
+            {
+                if (pipeHandle != IntPtr.Zero)
+                {
+                    WindowsJobObjectApi.CloseHandle(pipeHandle);
+                }
+            }
         }
 
-        protected async Task<bool> PollServerStatusAsync()
+        protected virtual async Task<bool> PollServerStatusAsync()
         {
             for (int i = 0; i < maxAttempts; i++)
             {
@@ -176,8 +259,7 @@
                         status = JsonUtility.FromJson<StatusResponse>(request.downloadHandler.text);
                         if (request.responseCode == 200 || status != null && status.ServerRunning)
                         {
-                            onMessage(SERVER_RUNNING_SUCCESS);
-                            Debug.LogError(SERVER_RUNNING_SUCCESS);
+                            onMessageProgress(SERVER_RUNNING_SUCCESS, 1f);
                             return true;
                         }
                         else
@@ -186,7 +268,7 @@
                             Debug.LogError($"SERVER NOT RUNNING OR NULL {message}");
                         }
                     }
-                    else
+                    else if(i == maxAttempts - 1)
                     {
                         Debug.LogError($"error result {request.result}");
                     }
@@ -194,8 +276,7 @@
                     await Task.Delay(1000);
                 }
             }
-            onMessage(SERVER_RUNNING_FAILED);
-            Debug.LogError(SERVER_RUNNING_FAILED);
+            onMessageProgress(SERVER_RUNNING_FAILED, 1f);
             return false;
         }
         
@@ -220,18 +301,18 @@
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"Ошибка чтения реестра: {ex.Message}");
+                    Debug.LogError($"Error reading registry: {ex.Message}");
                 }
 
                 return null;
             });
         }
         
-        protected virtual bool IsContainsString(string error)
+        protected virtual bool IsContainsString(string error, string[] data)
         {
-            for (int i = 0; i < ignoreErrorFields.Length; i++)
+            for (int i = 0; i < data.Length; i++)
             {
-                if (error.Contains(ignoreErrorFields[i]))
+                if (error.Contains(data[i]))
                 {
                     return true;
                 }
@@ -240,43 +321,18 @@
             return false;
         }
 
-        protected virtual void Unsibscribe(object sender, EventArgs eventArgs)
+        public void Dispose()
         {
-            Debug.LogError("Unsibscribe");
-            // process.ErrorDataReceived -= errorHandler;
-            // process.Exited -= exitHandler;
-        }
-        
-        protected virtual void CheckErrors(object sender, DataReceivedEventArgs e)
-        {
-            Debug.LogError($"ErrorsDelegate: {e.Data}");
-            if (!string.IsNullOrEmpty(e.Data) && IsContainsString(e.Data))
-            {
-                Unsibscribe(sender, e);
-            }
-        }
-        
-        
-        private async Task ShutdownPythonServerAsync()
-        {
-            request = UnityWebRequest.PostWwwForm(SHUTDOWN_URL, "");
-            using (request)
-            {
-                await request.SendWebRequest();
+            WindowsJobObjectApi.CloseHandle(stdoutRead);
+            WindowsJobObjectApi.CloseHandle(stderrRead);
+            WindowsJobObjectApi.CloseHandle(stdoutWrite);
+            WindowsJobObjectApi.CloseHandle(stderrWrite);
             
-#if UNITY_2020_1_OR_NEWER
-                if (request.result != UnityWebRequest.Result.Success)
-#else
-            if (request.isNetworkError || request.isHttpError)
-#endif
-                {
-                    Debug.LogError("Error trying to terminate Python server:" + request.error);
-                }
-                else
-                {
-                    Debug.Log("The request to terminate the Python server was sent successfully.");
-                }
-            }
+            cancellationToken?.Cancel();
+            cancellationToken?.Dispose();
+            cancellationToken = null;
+            
+            GC.SuppressFinalize(this);
         }
     }
 }

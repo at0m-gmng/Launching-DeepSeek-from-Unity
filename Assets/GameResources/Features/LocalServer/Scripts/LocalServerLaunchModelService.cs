@@ -2,6 +2,7 @@
 {
     using System.Collections.Generic;
     using System.Threading.Tasks;
+    using Cysharp.Threading.Tasks;
     using GameResources.Services.Scripts;
     using PithonInstaller.Scripts.PythonChecker;
     using PithonInstaller.Scripts.PytonDownloader;

@@ -47,6 +47,9 @@
 
         public virtual async Task<bool> TryRegister()
         {
+            onMessageProgress(INSTALL_DEPENDENCIES, 0f);
+            await Task.Delay(100);
+            
             requirementsPath = Path.Combine(Application.streamingAssetsPath, dependenciesPath);
 
             if (!File.Exists(requirementsPath))
@@ -54,13 +57,10 @@
                 Debug.LogError("Requirements.txt file not found at path:" + requirementsPath);
                 return false;
             }
-
-            onMessageProgress("Start install dependencies", 0f);
-            await Task.Delay(100);
             
             if (await InstallDependencies())
             {
-                onMessageProgress("Dependencies installation complete", 1f);
+                onMessageProgress(INSTALL_DEPENDENCIES_ENDED, 1f);
                 return true;
             }
             else
@@ -98,29 +98,27 @@
                 
                 if (success)
                 {
-                    // Ожидание завершения процесса
                     uint result = WindowsJobObjectApi.WaitForSingleObject(processInfo.hProcess, WindowsJobObjectApi.INFINITE);
 
                     if (result == WindowsJobObjectApi.WAIT_OBJECT_0)
                     {
-                        // Процесс завершился успешно
                         uint exitCode;
                         WindowsJobObjectApi.GetExitCodeProcess(processInfo.hProcess, out exitCode);
 
                         if (exitCode == 0)
                         {
-                            Debug.LogError("Процесс завершился успешно");
+                            Debug.LogError("The process completed successfully");
                             return true;
                         }
                         else
                         {
-                            Debug.LogError($"Процесс завершился с ошибкой, код выхода: {exitCode}");
+                            Debug.LogError($"The process ended with an error, exit code: {exitCode}");
                             return false;
                         }
                     }
                     else
                     {
-                        Debug.LogError($"WaitForSingleObject завершился с ошибкой, результат: {result}");
+                        Debug.LogError($"WaitForSingleObject failed with error, result: {result}");
                         return false;
                     }
                 }
